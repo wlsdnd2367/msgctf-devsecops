@@ -1,0 +1,2 @@
+test:
+	python -m py_compile app.py

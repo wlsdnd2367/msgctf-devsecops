@@ -1,0 +1,12 @@
+[challenge]
+id = "web100"
+
+[deployment]
+resource_profile = "small"
+
+[image]
+ref = "docker.io/library/nginx:1.29-alpine"
+port = 80
+
+[monitoring]
+health_path = "/"
