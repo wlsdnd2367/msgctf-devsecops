@@ -52,7 +52,7 @@ jobs:
       - name: Resolve submitted image
         id: input-image
         run: |
-          submitted="${{ inputs.submitted_image || github.event.inputs.submitted_image }}"
+          submitted="${{ inputs.submitted_image }}"
           if [ -z "$submitted" ]; then
             submitted="${{ steps.spec.outputs.submitted_image }}"
           fi
@@ -67,9 +67,11 @@ jobs:
         uses: docker/setup-buildx-action@v3
 
       - name: Run Gitleaks on metadata repo
-        uses: gitleaks/gitleaks-action@v2
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          docker run --rm \
+            -v "$PWD:/repo" \
+            zricethezav/gitleaks:latest \
+            detect --source=/repo --no-git --redact --verbose
 
       - name: Pull submitted image
         run: |

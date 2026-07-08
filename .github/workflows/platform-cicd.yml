@@ -63,9 +63,11 @@ jobs:
           fetch-depth: 0
 
       - name: Run Gitleaks
-        uses: gitleaks/gitleaks-action@v2
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          docker run --rm \
+            -v "$PWD:/repo" \
+            zricethezav/gitleaks:latest \
+            detect --source=/repo --no-git --redact --verbose
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
