@@ -57,21 +57,6 @@ jobs:
         env:
           SUBMITTED_IMAGE: ${{ steps.spec.outputs.submitted_image }}
         run: |
-<<<<<<< HEAD
-          docker pull "${{ steps.input-image.outputs.submitted_image }}"
-          
-      - name: Debug Trivy
-        uses: aquasecurity/trivy-action@v0.36.0
-        with:
-          image-ref: ${{ steps.input-image.outputs.submitted_image }}
-          format: table
-          scanners: vuln
-          severity: CRITICAL
-          ignore-unfixed: true
-          exit-code: "0"
-          
-      - name: Run Trivy image scan
-=======
           docker pull "$SUBMITTED_IMAGE"
 
       - name: Pin submitted image digest
@@ -84,8 +69,19 @@ jobs:
           echo "submitted_pinned_image=$pinned" >> "$GITHUB_OUTPUT"
           echo "submitted_digest=$digest" >> "$GITHUB_OUTPUT"
 
-      - name: Run Trivy vulnerability scan
->>>>>>> e93ac17 (Harden DevSecOps pipelines from security review)
+      - name: Gate Trivy vulnerability scan
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          version: v0.72.0
+          image-ref: ${{ steps.submitted-digest.outputs.submitted_pinned_image }}
+          format: table
+          scanners: vuln
+          severity: CRITICAL
+          ignore-unfixed: true
+          exit-code: "1"
+
+      - name: Write Trivy vulnerability SARIF
+        if: always()
         uses: aquasecurity/trivy-action@v0.36.0
         with:
           version: v0.72.0
@@ -93,13 +89,21 @@ jobs:
           format: sarif
           output: trivy-vuln-results.sarif
           scanners: vuln
-          severity: CRITICAL
           ignore-unfixed: true
+          exit-code: "0"
+
+      - name: Gate Trivy image secret scan
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          version: v0.72.0
+          image-ref: ${{ steps.submitted-digest.outputs.submitted_pinned_image }}
+          format: table
+          scanners: secret
+          severity: HIGH,CRITICAL
           exit-code: "1"
 
-<<<<<<< HEAD
-=======
-      - name: Run Trivy image secret scan
+      - name: Write Trivy secret SARIF
+        if: always()
         uses: aquasecurity/trivy-action@v0.36.0
         with:
           version: v0.72.0
@@ -107,8 +111,7 @@ jobs:
           format: sarif
           output: trivy-secret-results.sarif
           scanners: secret
-          severity: HIGH,CRITICAL
-          exit-code: "1"
+          exit-code: "0"
 
       - name: Upload Trivy vulnerability SARIF
         if: always()
@@ -122,7 +125,6 @@ jobs:
         with:
           sarif_file: trivy-secret-results.sarif
 
->>>>>>> e93ac17 (Harden DevSecOps pipelines from security review)
       - name: Health check submitted image
         env:
           SUBMITTED_PINNED_IMAGE: ${{ steps.submitted-digest.outputs.submitted_pinned_image }}
