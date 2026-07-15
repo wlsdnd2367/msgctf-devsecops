@@ -17,9 +17,6 @@ on:
 
 permissions:
   contents: read
-  packages: write
-  security-events: write
-  id-token: write
 
 env:
   REGISTRY: ghcr.io
@@ -27,6 +24,8 @@ env:
 jobs:
   test:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     strategy:
       fail-fast: false
       matrix:
@@ -52,6 +51,10 @@ jobs:
   build-scan-push:
     needs: test
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+      security-events: write
     strategy:
       fail-fast: false
       matrix:
@@ -106,20 +109,31 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Push image to GHCR
+      - name: Push scanned image to GHCR
         if: github.event_name != 'pull_request'
-        uses: docker/build-push-action@v6
-        with:
-          context: ./${{ matrix.component }}
-          push: true
-          tags: |
-            ${{ env.REGISTRY }}/${{ github.repository_owner }}/msgctf-${{ matrix.component }}:${{ github.sha }}
-            ${{ env.REGISTRY }}/${{ github.repository_owner }}/msgctf-${{ matrix.component }}:latest
+        env:
+          IMAGE: ${{ env.REGISTRY }}/${{ github.repository_owner }}/msgctf-${{ matrix.component }}
+        run: |
+          docker tag "${IMAGE}:${GITHUB_SHA}" "${IMAGE}:latest"
+          docker push "${IMAGE}:${GITHUB_SHA}"
+          docker push "${IMAGE}:latest"
+
+      - name: Extract pushed digest
+        id: digest
+        if: github.event_name != 'pull_request'
+        env:
+          IMAGE: ${{ env.REGISTRY }}/${{ github.repository_owner }}/msgctf-${{ matrix.component }}
+        run: |
+          digest="$(docker buildx imagetools inspect "${IMAGE}:${GITHUB_SHA}" --format '{{json .Manifest.Digest}}' | tr -d '"')"
+          echo "digest=$digest" >> "$GITHUB_OUTPUT"
 
   deploy-gke:
     needs: build-scan-push
     if: github.event_name != 'pull_request' && vars.ENABLE_GKE_DEPLOY == 'true'
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -140,6 +154,16 @@ jobs:
           location: ${{ secrets.GKE_LOCATION }}
 
       - name: Deploy platform manifests
+        env:
+          IMAGE_PREFIX: ${{ env.REGISTRY }}/${{ github.repository_owner }}
         run: |
           kubectl apply -f k8s/base/namespaces.yaml
           kubectl apply -f k8s/platform/
+          kubectl set image deployment/frontend frontend="${IMAGE_PREFIX}/msgctf-frontend:${GITHUB_SHA}" -n platform
+          kubectl set image deployment/backend backend="${IMAGE_PREFIX}/msgctf-backend:${GITHUB_SHA}" -n platform
+          kubectl set image deployment/runtime runtime="${IMAGE_PREFIX}/msgctf-runtime:${GITHUB_SHA}" -n platform
+          kubectl set image deployment/scheduler scheduler="${IMAGE_PREFIX}/msgctf-scheduler:${GITHUB_SHA}" -n platform
+          kubectl rollout status deployment/frontend -n platform --timeout=120s
+          kubectl rollout status deployment/backend -n platform --timeout=120s
+          kubectl rollout status deployment/runtime -n platform --timeout=120s
+          kubectl rollout status deployment/scheduler -n platform --timeout=120s

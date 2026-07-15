@@ -37,9 +37,21 @@ spec:
       labels:
         app.kubernetes.io/name: {name}
     spec:
+      serviceAccountName: challenge-runner
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
       containers:
         - name: challenge
           image: {image_ref}
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+            readOnlyRootFilesystem: true
           ports:
             - containerPort: {container_port}
           resources:
@@ -63,6 +75,13 @@ spec:
             periodSeconds: 20
 ---
 apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: challenge-runner
+  namespace: challenge
+automountServiceAccountToken: false
+---
+apiVersion: v1
 kind: Service
 metadata:
   name: {name}
@@ -78,6 +97,19 @@ spec:
     - name: http
       port: 80
       targetPort: {container_port}
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {name}-default-deny-egress
+  namespace: challenge
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: {name}
+  policyTypes:
+    - Egress
+  egress: []
 """
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(manifest, encoding="utf-8")

@@ -8,6 +8,8 @@ from pathlib import Path
 
 ALLOWED_PROFILES = {"small", "medium", "large"}
 ID_PATTERN = re.compile(r"^[a-z0-9][a-z0-9-]{1,62}$")
+IMAGE_REF_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:/@-]{2,254}$")
+HEALTH_PATH_PATTERN = re.compile(r"^/[A-Za-z0-9._~/-]*$")
 
 
 def fail(message):
@@ -35,6 +37,14 @@ def validate(spec_path):
         raise ValueError(f"deployment.resource_profile must be one of {sorted(ALLOWED_PROFILES)}")
     if not image_ref:
         raise ValueError("image.ref is required")
+    if not isinstance(image_ref, str):
+        raise ValueError("image.ref must be a string")
+    if "\n" in image_ref or "\r" in image_ref:
+        raise ValueError("image.ref must not contain line breaks")
+    if "?" in image_ref or "#" in image_ref:
+        raise ValueError("image.ref must not contain query strings or fragments")
+    if not IMAGE_REF_PATTERN.match(image_ref):
+        raise ValueError("image.ref contains unsupported characters")
     if ":" not in image_ref and "@" not in image_ref:
         raise ValueError("image.ref must include a tag or digest")
     if not isinstance(image_port, int):
@@ -43,8 +53,16 @@ def validate(spec_path):
         raise ValueError("image.port must be between 1 and 65535")
     if not health_path:
         raise ValueError("monitoring.health_path is required")
+    if not isinstance(health_path, str):
+        raise ValueError("monitoring.health_path must be a string")
+    if "\n" in health_path or "\r" in health_path:
+        raise ValueError("monitoring.health_path must not contain line breaks")
     if not health_path.startswith("/"):
         raise ValueError("monitoring.health_path must start with /")
+    if "?" in health_path or "#" in health_path:
+        raise ValueError("monitoring.health_path must not contain query strings or fragments")
+    if not HEALTH_PATH_PATTERN.match(health_path):
+        raise ValueError("monitoring.health_path contains unsupported characters")
 
     return {
         "challenge_id": challenge_id,
