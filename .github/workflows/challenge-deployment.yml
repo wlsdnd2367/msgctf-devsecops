@@ -145,9 +145,9 @@ jobs:
             --memory=512m \
             --read-only \
             --tmpfs /tmp:rw,noexec,nosuid,size=64m \
-            --tmpfs /var/cache/nginx:rw,noexec,nosuid,size=64m \
-            --tmpfs /var/log/nginx:rw,noexec,nosuid,size=16m \
-            --tmpfs /var/run:rw,noexec,nosuid,size=16m \
+            --tmpfs /var/cache/nginx:rw,noexec,nosuid,uid=101,gid=101,size=64m \
+            --tmpfs /var/log/nginx:rw,noexec,nosuid,uid=101,gid=101,size=16m \
+            --tmpfs /var/run:rw,noexec,nosuid,uid=101,gid=101,size=16m \
             -p "18080:${CONTAINER_PORT}" \
             "$SUBMITTED_PINNED_IMAGE")"
           trap 'docker rm -f "$container_id"' EXIT

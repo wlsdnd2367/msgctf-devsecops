@@ -5,8 +5,8 @@ id = "web100"
 resource_profile = "small"
 
 [image]
-ref = "docker.io/library/nginx:1.29-alpine"
-port = 80
+ref = "docker.io/nginxinc/nginx-unprivileged:1.29-alpine"
+port = 8080
 
 [monitoring]
 health_path = "/"
